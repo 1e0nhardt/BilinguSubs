@@ -50,8 +50,8 @@
 <!-- ACKNOWLEDGMENTS -->
 ## 效果展示
 
-参见[该视频](https://www.bilibili.com/video/BV15K42187te/)。
-
+[示例1](25:51)(https://www.bilibili.com/video/BV15K42187te/)。
+[示例2](1:56:32)(https://www.bilibili.com/video/BV1fJ4m1W7Sj/)。
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
