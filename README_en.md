@@ -64,8 +64,8 @@ see [whisper setup](https://github.com/openai/whisper?tab=readme-ov-file#setup)
 <!-- ACKNOWLEDGMENTS -->
 ## Example
 
-[Example 1](25:51)(https://www.bilibili.com/video/BV15K42187te/)。
-[Example 2](1:56:32)(https://www.bilibili.com/video/BV1fJ4m1W7Sj/)。
+[Example 1 (25:51)](https://www.bilibili.com/video/BV15K42187te/)。   
+[Example 2 (1:56:32)](https://www.bilibili.com/video/BV1fJ4m1W7Sj/)。
 
 
 <!-- MARKDOWN LINKS & IMAGES -->
