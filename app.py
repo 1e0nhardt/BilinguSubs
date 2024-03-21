@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import tyro
 import whisper
-from deep_translator import BaiduTranslator, GoogleTranslator
+from deep_translator import BaiduTranslator, GoogleTranslator, constants
 from rich.console import Console
 from rich.progress import Progress
 
@@ -29,12 +29,17 @@ class TaskConfig:
     audio_dir: str = 'assets/audio/'
     # 未翻译的字幕目录
     srt_dir: str = 'assets/srt/'
-    # 模型：tiny | base | small | medium | large
+    # 模型：tiny | base | small | medium | large | downloaded_model_path
     whisper_model: str = 'medium' 
-    # 只用最后224个token会被使用。'Hello, welcome to my lecture.'可以减少无标点符号的情况。之后的部分建议写一些可能很难识别的专用名词。
-    whisper_prompt: str = 'Hello, welcome to my lecture. And if a sentence is too long, break it at natural pauses. And this is a game dev video use Godot about Slay The Spire.'
+    # 只有最后224个token会被使用。'Hello, welcome to my lecture.'可以减少无标点符号的情况。之后的部分建议写一些可能很难识别的专用名词。此外，每一句话的前一句也会通过该脚本添加到prompt中。因此，这里的prompt长度建议不超过120个单词。
+    whisper_prompt: str = 'Hello, welcome to my lecture.'
+    # whisper_prompt: str = 'こんにちは、私の講義へようこそ。'
+    # whisper_prompt: str = 'Hello, welcome to my lecture. And this is a video about Godot game dev. Slay The Spire, bat, crab, bats, setter, getter, .tscn, packed scene, .gd, .res'
+
     # 用逗号断句的句子长度阈值
     comma_as_end_threshold: int = 80
+    # 调用翻译api每次发送的字符上限, 建议英文4500，日文1600。否则可能会报API server error.
+    api_character_limit = 4500
     # 只进行翻译(使用srt_dir中的.srt文件)
     only_translate: bool = False
     # 语音转文字+翻译(使用audio_dir中的.mp3, .wav文件)
@@ -51,6 +56,8 @@ class TaskConfig:
     src_lang: str = 'en'
     # 翻译目标语言
     tgt_lang: str = 'zh'
+    # 打印国家对应的缩写码
+    print_country_code: bool = False
 
 
 class GenerateSrtTask(object):
@@ -101,7 +108,10 @@ class GenerateSrtTask(object):
     def speech_to_text(self, basename):
         filename, suffix = os.path.splitext(basename)
         
-        audio_path = self.config.audio_dir + filename + '.mp3'
+        if self.config.input_is_audio:
+            audio_path = self.config.audio_dir + basename
+        else:
+            audio_path = self.config.audio_dir + filename + '.mp3'
         srt_path = self.config.srt_dir + filename + '.srt'
 
         if os.path.exists(srt_path):
@@ -154,10 +164,9 @@ class GenerateSrtTask(object):
         filename, suffix = os.path.splitext(basename)
 
         srt_path = self.config.srt_dir + filename + '.srt'
-        if (not self.config.only_translate) and (not self.config.input_is_audio):
-            bilingual_srt_path = self.config.video_dir + filename + '_zh&en.srt'
-        else:
-            bilingual_srt_path = self.config.srt_dir + filename + '_zh&en.srt'
+        suffix = ".srt" if True else '_zh&en.srt'
+        
+        bilingual_srt_path = self.config.video_dir + filename + suffix
 
         if os.path.exists(bilingual_srt_path):
             LOGGER.info(bilingual_srt_path + ' 已存在')
@@ -184,7 +193,7 @@ class GenerateSrtTask(object):
                     subtitle = text_lines[i]
                     total_chara += len(subtitle)
                     subtitles.append(text_lines[i])
-                    if total_chara > 4500:
+                    if total_chara > self.config.api_character_limit:
                         translation = translator.translate(''.join(subtitles))
                         translated_subtitles.extend(translation.split('\n'))
                         subtitles = []
@@ -217,6 +226,10 @@ if __name__ == '__main__':
 
     if args.task == 'translate':
         LOGGER.warn('Word-level timestamps on translations may not be reliable.(结果时间轴可能不准)')
+    
+    if args.print_country_code:
+        LOGGER.info(f"Google API: {constants.GOOGLE_LANGUAGES_TO_CODES}")
+        LOGGER.info(f"Baidu API: {constants.BAIDU_LANGUAGE_TO_CODE}")
 
     task = GenerateSrtTask(args)
 
