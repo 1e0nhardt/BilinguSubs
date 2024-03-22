@@ -230,6 +230,7 @@ if __name__ == '__main__':
     if args.print_country_code:
         LOGGER.info(f"Google API: {constants.GOOGLE_LANGUAGES_TO_CODES}")
         LOGGER.info(f"Baidu API: {constants.BAIDU_LANGUAGE_TO_CODE}")
+        exit()
 
     task = GenerateSrtTask(args)
 
