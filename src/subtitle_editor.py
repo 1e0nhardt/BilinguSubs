@@ -44,7 +44,11 @@ class SubtitleEditor(ttk.Frame):
         container_right = ttk.Frame(container)
         container_right.pack(side=LEFT, fill=X, expand=YES)
 
-        self.text_editor = ttk.Text(container_right, height=5)
+        self.text_editor = ttk.Text(
+            container_right, 
+            height=5,
+            font="-size 12"
+        )
         # self.text_editor.insert(INSERT, "hello world")
         self.text_editor.pack(fill=X, expand=TRUE)
         self.text_editor.bind("<Key>", self.on_text_changed)
@@ -68,7 +72,7 @@ class SubtitleEditor(ttk.Frame):
     def on_text_changed(self, e):
         if self.app.srt_container.is_empty():
             return
-            
+
         LOGGER.debug(f"KeyTyped {e.char}")
         if self.is_next:
             self.app.srt_container.get_current_next_clip().update_text(self.text_editor.get(0.0, END))
