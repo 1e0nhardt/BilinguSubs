@@ -103,12 +103,14 @@ class SrtContainer(object):
             line = line.strip()
 
             if line.isdigit():
-                clip.set_id(int(line))
                 if len(all_text) > 0:
                     clip.set_text("\n".join(all_text))
                     self.clips.append(clip)
                     clip = SrtClip()
+                    clip.set_id(int(line))
                     all_text = []
+                else: # 第一条
+                    clip.set_id(int(line))
                     
             elif line.find("-->") != -1:
                 clip.set_time_range(line)
