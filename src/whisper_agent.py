@@ -8,6 +8,7 @@ from rich.console import Console
 
 from srt_assembler import SrtAssembler
 from src.config import AppConfig
+from src.srt_container import SrtClip
 from utils import LOGGER, ensure_folder_exists, extract_sound_from_video
 
 warnings.filterwarnings('ignore')
@@ -22,8 +23,43 @@ class WhisperAgent(object):
     def __init__(self, config: AppConfig) -> None:
         self.config = config
         self.model = None
+        self.audio_np = None
 
-        self.update_video_path(self.config.video_path)
+        self.update_video_path()
+
+        if self.config.use_baidu_api:
+            self.translator = BaiduTranslator(
+                source=self.config.src_lang, target=self.config.tgt_lang, 
+                appid=self.config.baidu_appid, appkey=self.config.baidu_appkey
+            )
+        else:
+            if self.config.tgt_lang == 'zh':
+                self.config.tgt_lang = 'zh-CN'
+            # 有最多5000字符限制
+            self.translator = GoogleTranslator(source=self.config.src_lang, target=self.config.tgt_lang)
+    
+    def translate(self, text):
+        return self.translator.translate(text)
+    
+    def tanscribe(self, clip: SrtClip):
+        if not self.model:
+            with CONSOLE.status('模型加载中...'):
+                self.model = whisper.load_model(self.config.whisper_model)
+        
+        self.prepare_audio()
+        
+        clip_start = int(clip.get_start_time_ms() / 1000 * SAMPLE_RATE)
+        clip_end = int((clip.get_end_time_ms()) / 1000 * SAMPLE_RATE)
+
+        result = self.model.transcribe(self.audio_np[clip_start:clip_end], word_timestamps=True, initial_prompt=self.config.whisper_prompt, task=self.config.task)
+
+        transcribe_text = ""
+        for segment in result['segments']:
+            for word_dict in segment['words']:
+                transcribe_text += (word_dict['word'])
+
+        clip.source_text = transcribe_text
+        clip.target_text = self.translate(transcribe_text)
 
     def extract_audio_from_video(self):
         if self.path_exists(self.audio_path):
@@ -31,24 +67,19 @@ class WhisperAgent(object):
         
         extract_sound_from_video(self.config.video_path, self.audio_path, format='mp3')
 
-    def speech_to_text(self, 
-            start=0, # ms
-            end=0
-        ):
+    def speech_to_text(self):
         if self.path_exists(self.srt_path):
             return
-        
-        if not self.path_exists(self.audio_path):
-            self.extract_audio_from_video()
         
         if not self.model:
             with CONSOLE.status('模型加载中...'):
                 self.model = whisper.load_model(self.config.whisper_model)
 
         # 将音频读取为numpy
-        self.audio_np = whisper.audio.load_audio(self.audio_path)
+        # self.audio_np = whisper.audio.load_audio(self.audio_path)
+        self.prepare_audio()
 
-        # 选取长5分钟的片段
+        # 选取长6分钟的片段
         clip_start = 0
         clip_end = clip_start + 6 * 60 * SAMPLE_RATE
         clip_last_sentence = ''
@@ -72,21 +103,10 @@ class WhisperAgent(object):
                     sa.get_next_input(word_dict, clip_start / SAMPLE_RATE)
             
         sa.generate_srt(self.srt_path)
-
+    
     def translate_srt(self):
         if self.path_exists(self.bi_srt_path):
             return
-        
-        if self.config.use_baidu_api:
-            translator = BaiduTranslator(
-                source=self.config.src_lang, target=self.config.tgt_lang, 
-                appid=self.config.baidu_appid, appkey=self.config.baidu_appkey
-            )
-        else:
-            if self.config.tgt_lang == 'zh':
-                self.config.tgt_lang = 'zh-CN'
-            # 有最多5000字符限制
-            translator = GoogleTranslator(source=self.config.src_lang, target=self.config.tgt_lang)
 
         subtitles = []
         translated_subtitles = []
@@ -98,13 +118,13 @@ class WhisperAgent(object):
                 total_chara += len(subtitle)
                 subtitles.append(text_lines[i])
                 if total_chara > self.config.api_character_limit:
-                    translation = translator.translate(''.join(subtitles))
+                    translation = self.translator.translate(''.join(subtitles))
                     translated_subtitles.extend(translation.split('\n'))
                     subtitles = []
                     total_chara = 0
                     time.sleep(.2) # 等待0.2秒
 
-            translation = translator.translate(''.join(subtitles))
+            translation = self.translator.translate(''.join(subtitles))
             translated_subtitles.extend(translation.split('\n'))
 
         for i in range(2, len(text_lines) - 1, 4):
@@ -122,7 +142,9 @@ class WhisperAgent(object):
             return True
         return False
     
-    def update_video_path(self, path):
+    def update_video_path(self):
+        path = self.config.video_path
+        LOGGER.debug(path)
         filename, suffix = os.path.splitext(os.path.basename(path))
         ensure_folder_exists(self.config.audio_dir)
         ensure_folder_exists(self.config.srt_dir)
@@ -133,3 +155,16 @@ class WhisperAgent(object):
         LOGGER.info(f'SrtPath: {self.srt_path}')
 
         self.audio_np = None
+    
+    def prepare_audio(self):
+        if self.audio_np is not None:
+            return
+        
+        if not self.path_exists(self.audio_path):
+            LOGGER.info("提取音频中...")
+            self.extract_audio_from_video()
+            LOGGER.info("提取音频完成")
+        
+        self.audio_np = whisper.audio.load_audio(self.audio_path)
+        
+

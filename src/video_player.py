@@ -76,10 +76,11 @@ class MediaPlayer(ttk.Frame):
         self.update_time_labels(val)
         self.scale.set(val)
 
-    def on_progress(self, val: float):
-        if not self.scale_pressed:
+    def on_progress(self, val: float, force=False):
+        if (not force) and (not self.scale_pressed):
             return
-
+            
+        print(f"Set Position {val} after")
         self.update_time_labels(val)
         self.player.set_position(val)
         self.app.update_clip(self.player.get_time())
@@ -87,3 +88,4 @@ class MediaPlayer(ttk.Frame):
     def on_player_update(self, event):
         self.set_progress(self.player.get_position())
         self.app.update_clip(self.player.get_time())
+

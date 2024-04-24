@@ -32,6 +32,12 @@ LOGGER = logging.getLogger("rich")
 install(show_locals=False)
 
 
+def timeline_to_ms(timeline: str):
+    hrs, mins, sec_ms = timeline.strip().split(':')
+    seconds, ms = sec_ms.split(",")
+    return (int(hrs) * 60 * 60 + int(mins) * 60 + int(seconds)) * 1000 + int(ms)
+
+
 def ensure_folder_exists(path: str):
     if not os.path.exists(path):
         LOGGER.info(f'[red]Directory {path} does not exist, creating...[/]')

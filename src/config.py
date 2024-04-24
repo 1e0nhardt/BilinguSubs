@@ -17,6 +17,8 @@ class AppConfig:
     api_character_limit = 4200
     # 任务类型 transcribe | translate
     task: str = 'transcribe'
+    # 翻译后只保留中文字幕
+    only_zh: bool = False
     # 使用百度api
     use_baidu_api: bool = False
     # 使用chatglm-6b进行翻译。 速度慢，效果也差。

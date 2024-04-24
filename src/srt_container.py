@@ -17,8 +17,10 @@ class SrtClip(object):
     def set_time_range(self, time_line:str):
         if time_line.find("-->") == -1:
             LOGGER.error(f"时间戳格式不合法！ {time_line}")
-        self.start, self.end = time_line.split("-->")
-    
+        splits = time_line.split("-->")
+        self.start = splits[0].strip()
+        self.end = splits[1].strip()
+
     def set_text(self, text: str):
         splits = text.strip().splitlines()
         if len(splits) == 1:
@@ -29,6 +31,9 @@ class SrtClip(object):
             self.source_text = text
             LOGGER.warn(f"异常字幕数据: {text}")
     
+    def get_start_time_ms(self):
+        return self.timeline_to_ms(self.start)
+
     def get_end_time_ms(self):
         return self.timeline_to_ms(self.end)
     
@@ -44,7 +49,7 @@ class SrtClip(object):
             self.source_text, self.target_text = splits
         else:
             self.source_text = all_text
-            LOGGER.warn(f"异常字幕数据: {all_text}")
+            LOGGER.warn(f"非双语字幕数据: {all_text}")
     
     def timeline_to_ms(self, timeline: str):
         hrs, mins, sec_ms = timeline.strip().split(':')
@@ -57,9 +62,24 @@ class SrtContainer(object):
     def __init__(self) -> None:
         self.clips = []
         self.current_index = -1
+
+    def is_empty(self) -> bool:
+        return len(self.clips) == 0
     
     def get_current_clip(self) -> SrtClip:
+        if len(self.clips) == 0:
+            return
         return self.clips[self.current_index]
+
+    def get_current_prev_clip(self) -> SrtClip:
+        if self.current_index == 0:
+            return None
+        return self.clips[self.current_index - 1]
+
+    def get_current_next_clip(self) -> SrtClip:
+        if self.current_index + 2 > len(self.clips):
+            return None
+        return self.clips[self.current_index + 1]
 
     def udpate_current_clip(self, new_text):
         self.clips[self.current_index].update_text(new_text)
@@ -76,6 +96,9 @@ class SrtContainer(object):
         return f'{hours:02d}:{minutes:02d}:{seconds:02d},{ms}'
     
     def update_current_clip(self, play_time: float) -> bool:
+        if self.get_current_clip() is None:
+            return 
+
         if self.get_current_clip().time_in_clip(play_time):
             return False
         
@@ -90,6 +113,7 @@ class SrtContainer(object):
         return True
 
     def load_srt(self, path):
+        self.clips.clear()
         if not os.path.isfile(path):
             LOGGER.error(f"字幕加载失败，路径{path}不存在")
             return
@@ -120,4 +144,12 @@ class SrtContainer(object):
         self.current_index = 0
             
     def export_srt(self):
-        pass
+        srt_text = ""
+        for clip in self.clips:
+            srt_text += f"{clip.id}\n"
+            srt_text += f"{clip.start} --> {clip.end}\n"
+            srt_text += f"{clip.source_text.strip()}\n"
+            srt_text += f"{clip.target_text.strip()}\n"
+            srt_text += "\n"
+        
+        return srt_text
