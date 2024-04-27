@@ -11,6 +11,7 @@ from rich.progress import Progress
 
 from srt_assembler import SrtAssembler
 from utils import LOGGER, ensure_folder_exists, extract_sound_from_video
+from src.ass_container import SCRIPT_INFO, STYLES
 
 warnings.filterwarnings('ignore')
 CONSOLE = Console()
@@ -29,21 +30,23 @@ class TaskConfig:
     audio_dir: str = 'assets/audio/'
     # 未翻译的字幕目录
     srt_dir: str = 'assets/srt/'
+    # 字幕文件类型 .srt | .ass
+    subtitle_type: str = '.ass'
     # 模型：tiny | base | small | medium | large | downloaded_model_path
     whisper_model: str = 'medium' 
     # 只有最后224个token会被使用。'Hello, welcome to my lecture.'可以减少无标点符号的情况。之后的部分建议写一些可能很难识别的专用名词。此外，每一句话的前一句也会通过该脚本添加到prompt中。因此，这里的prompt长度建议不超过120个单词。
-    whisper_prompt: str = 'Hello, welcome to my lecture.'
+    # whisper_prompt: str = "Hello, welcome to my lecture. Game dev about splines, bezier curve, De Casteljau's algorithm jerk."
     # whisper_prompt: str = 'こんにちは、私の講義へようこそ。'
-    # whisper_prompt: str = 'Hello, welcome to my lecture. And this is a video about Godot game dev. Slay The Spire, bat, crab, bats, setter, getter, .tscn, packed scene, .gd, .res'
+    whisper_prompt: str = 'Hello, welcome to my lecture. And this is a video about Godot game dev. Slay The Spire, bat, crab, bats, setter, getter, .tscn, packed scene, .gd, .res'
 
     # 用逗号断句的句子长度阈值
-    comma_as_end_threshold: int = 80
+    comma_as_end_threshold: int = 70
     # 调用翻译api每次发送的字符上限, 建议英文4500，日文1600。否则可能会报API server error.
-    api_character_limit = 4500
+    api_character_limit = 4200
     # 只进行翻译(使用srt_dir中的.srt文件)
     only_translate: bool = False
-    # 语音转文字+翻译(使用audio_dir中的.mp3, .wav文件)
-    input_is_audio: bool = False
+    # 语音转文字+翻译(使用audio_dir中的.mp3, .wav, .m4a文件)
+    input_is_audio: bool = True
     # 翻译后只保留中文字幕
     only_zh: bool = False
     # 任务类型 transcribe | translate
@@ -68,7 +71,7 @@ class GenerateSrtTask(object):
 
         self._video_names = list(filter(lambda s: s.endswith(('mp4', 'mkv')), os.listdir(config.video_dir)))
         if self.config.input_is_audio:
-            self._video_names = list(filter(lambda s: s.endswith(('mp3', 'wav')), os.listdir(config.audio_dir)))
+            self._video_names = list(filter(lambda s: s.endswith(('mp3', 'wav', 'm4a')), os.listdir(config.audio_dir)))
         if self.config.only_translate:
             self._video_names = list(filter(lambda s: s.endswith('srt'), os.listdir(config.srt_dir)))
     
@@ -128,9 +131,9 @@ class GenerateSrtTask(object):
         # 将音频读取为numpy
         audio_np = whisper.audio.load_audio(audio_path)
 
-        # 选取长5分钟的片段
+        # 选取长6分钟的片段
         clip_start = 0
-        clip_end = clip_start + 5 * 60 * SAMPLE_RATE
+        clip_end = clip_start + 6 * 60 * SAMPLE_RATE
         clip_last_sentence = ''
 
         # 逐片段转文本
@@ -143,7 +146,7 @@ class GenerateSrtTask(object):
                     sa.get_next_input(word_dict, clip_start / SAMPLE_RATE)
             
             clip_start, clip_last_sentence = sa.get_clip_end_info(SAMPLE_RATE)
-            clip_end = clip_start + 5 * 60 * SAMPLE_RATE
+            clip_end = clip_start + 6 * 60 * SAMPLE_RATE
 
             self.progress.update(whisper_task, advance=(clip_end - clip_start)/audio_np.size*100)
         else:
@@ -163,10 +166,8 @@ class GenerateSrtTask(object):
     def translate_srt(self, basename):
         filename, suffix = os.path.splitext(basename)
 
-        srt_path = self.config.srt_dir + filename + '.srt'
-        suffix = ".srt" if True else '_zh&en.srt'
-        
-        bilingual_srt_path = self.config.video_dir + filename + suffix
+        srt_path = self.config.srt_dir + filename + self.config.subtitle_type
+        bilingual_srt_path = self.config.video_dir + filename + self.config.subtitle_type
 
         if os.path.exists(bilingual_srt_path):
             LOGGER.info(bilingual_srt_path + ' 已存在')
@@ -203,14 +204,41 @@ class GenerateSrtTask(object):
                 translation = translator.translate(''.join(subtitles))
                 translated_subtitles.extend(translation.split('\n'))
 
-            for i in range(2, len(text_lines) - 1, 4):
-                if self.config.only_zh:
-                    text_lines[i] = translated_subtitles[(i - 2) // 4] + '\n' # 单独中文字幕
-                else:
-                    text_lines[i] = translated_subtitles[(i - 2) // 4] + '\n' + text_lines[i] # 中英混合
+            if self.config.subtitle_type == '.srt':
+                for i in range(2, len(text_lines) - 1, 4):
+                    if self.config.only_zh:
+                        text_lines[i] = translated_subtitles[(i - 2) // 4] + '\n' # 单独中文字幕
+                    else:
+                        text_lines[i] = translated_subtitles[(i - 2) // 4] + '\n' + text_lines[i] # 中英混合
 
-            with open(bilingual_srt_path, 'w', encoding='utf-8') as f:
-                f.write(''.join(text_lines))
+                with open(bilingual_srt_path, 'w', encoding='utf-8') as f:
+                    f.write(''.join(text_lines))
+
+            elif self.config.subtitle_type == '.ass':
+                with open(bilingual_srt_path, 'w', encoding='utf-8') as f:
+                    f.write(
+                        SCRIPT_INFO + '\n\n' 
+                        + STYLES + '\n\n' 
+                        + '[Events]\n' 
+                        + 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n'
+                    )
+
+                    srt_text = ""
+                    for i in range(0, len(text_lines) - 1, 4):
+                        srt_text += f"Dialogue: "
+                        clip_start, clip_end = text_lines[i+1].split('-->')
+                        clip_start = clip_start.strip().replace(',', '.')[:-1]
+                        clip_end = clip_end.strip().replace(',', '.')[:-1]
+                        srt_text += f"0,{clip_start},{clip_end},ZH,"
+                        srt_text += f",0,0,0,"
+                        if self.config.only_zh:
+                            srt_text += f",{translated_subtitles[i // 4]}"
+                        else:
+                            # srt_text += f",{translated_subtitles[i // 4]}\\N\\fs14{text_lines[i+2].strip()}\n"
+                            srt_text += f",{translated_subtitles[i // 4]}\\N" + "{\\rEN}" + f"{text_lines[i+2].strip()}\n"
+                    f.write(srt_text)
+            else:
+                LOGGER.error(f'只支持.srt|.ass两种类型的字幕文件。当前: {self.config.subtitle_type}')
 
         LOGGER.info(filename + ' 翻译完成')
 
