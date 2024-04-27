@@ -1,7 +1,7 @@
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 
-from src.subtitle_edit_app import SrtClip
+from src.srt_container import Clip
 from utils import LOGGER
 
 class SubtitleEditor(ttk.Frame):
@@ -56,7 +56,7 @@ class SubtitleEditor(ttk.Frame):
         # self.text_editor.tag_config("good", background="yellow", foreground="red") #　设置"good"区域背景和前景颜色
         # self.text_editor.tag_bind("good", "<Button-1>", lambda e: print("hello world"))
     
-    def load_clip(self, clip: SrtClip):
+    def load_clip(self, clip: Clip):
         if clip is None:
             return
             
@@ -64,17 +64,20 @@ class SubtitleEditor(ttk.Frame):
         self.time_label_start.set(clip.start)
         self.time_label_end.set(clip.end)
         self.text_editor.delete(1.0, END)
-        self.text_editor.insert(INSERT, clip.full_text())
+        full_text = clip.full_text()
+        if clip.type == 'ass':
+            full_text = clip.style['Style'] + '\n' + full_text
+        self.text_editor.insert(INSERT, full_text)
     
     def insert_text(self, text):
         self.text_editor.index(END, "\n" + text)
     
     def on_text_changed(self, e):
-        if self.app.srt_container.is_empty():
+        if self.app.subtitle_container.is_empty():
             return
 
         LOGGER.debug(f"KeyTyped {e.char}")
         if self.is_next:
-            self.app.srt_container.get_current_next_clip().update_text(self.text_editor.get(0.0, END))
+            self.app.subtitle_container.get_current_next_clip().update_text(self.text_editor.get(0.0, END))
         else:
-            self.app.srt_container.get_current_clip().update_text(self.text_editor.get(0.0, END))
+            self.app.subtitle_container.get_current_clip().update_text(self.text_editor.get(0.0, END))

@@ -8,7 +8,7 @@ from rich.console import Console
 
 from srt_assembler import SrtAssembler
 from src.config import AppConfig
-from src.srt_container import SrtClip
+from src.srt_container import Clip
 from utils import LOGGER, ensure_folder_exists, extract_sound_from_video
 
 warnings.filterwarnings('ignore')
@@ -41,7 +41,7 @@ class WhisperAgent(object):
     def translate(self, text):
         return self.translator.translate(text)
     
-    def tanscribe(self, clip: SrtClip):
+    def tanscribe(self, clip: Clip):
         if not self.model:
             with CONSOLE.status('模型加载中...'):
                 self.model = whisper.load_model(self.config.whisper_model)
@@ -58,7 +58,7 @@ class WhisperAgent(object):
             for word_dict in segment['words']:
                 transcribe_text += (word_dict['word'])
 
-        clip.source_text = transcribe_text
+        clip.source_text = transcribe_text.strip()
         clip.target_text = self.translate(transcribe_text)
 
     def extract_audio_from_video(self):
@@ -149,8 +149,8 @@ class WhisperAgent(object):
         ensure_folder_exists(self.config.audio_dir)
         ensure_folder_exists(self.config.srt_dir)
         self.audio_path = self.config.audio_dir + filename + '.mp3'
-        self.srt_path = self.config.srt_dir + filename + '_en.srt'
-        self.bi_srt_path = self.config.srt_dir + filename + '.srt'
+        self.srt_path = self.config.srt_dir + filename + '_en' + self.config.subtitle_type
+        self.bi_srt_path = self.config.srt_dir + filename + self.config.subtitle_type
         LOGGER.info(f'AudioPath: {self.audio_path}')
         LOGGER.info(f'SrtPath: {self.srt_path}')
 

@@ -16,6 +16,7 @@ class VlcPlayer:
     '''
 
     def __init__(self, *args):
+        self.uri = None
         if args:
             instance = vlc.Instance(*args)
             self.media = instance.media_player_new()
@@ -23,9 +24,24 @@ class VlcPlayer:
             self.media = vlc.MediaPlayer()
 
     # 设置待播放的url地址或本地文件路径，每次调用都会重新加载资源
-    def set_uri(self, uri):
-        self.media.set_mrl(uri)
-
+    def set_uri(self, uri, *options):
+        self.uri = uri
+        self.media.set_mrl(uri, *options)
+    
+    def reload_ass(self, sub_path):
+        # m = self.Instance.media_new(str(self.uri))
+        # self.media.set_mrl(self.uri, sub_path)
+        print('file:\\\\' + sub_path)
+        # m = self.media.get_instance().media_new_path(self.uri)
+        # ret = m.slaves_add(vlc.MediaSlaveType.subtitle, 4, 'file:\\\\' + sub_path)
+        # self.media.set_media(m)
+        # ret = self.media.add_slave(vlc.MediaSlaveType.subtitle, 'file:\\\\' + sub_path, False)
+        ret = self.media.add_slave(vlc.MediaSlaveType.subtitle, sub_path, True)
+        # ret = self.media.video_set_subtitle_file(sub_path)
+        print(f"换字幕 {ret}")
+        print(self.media.video_get_spu_count())
+        print(self.media.video_get_spu())
+        
     # 播放 成功返回0，失败返回-1
     def play(self, path=None):
         if path:

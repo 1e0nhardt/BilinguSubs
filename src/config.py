@@ -2,9 +2,10 @@ from dataclasses import dataclass
 
 @dataclass
 class AppConfig:
-    video_path: str = "assets/video/sts.mp4"
+    video_path: str = "assets/video/ff1.mp4"
     audio_dir: str = "assets/audio/"
     srt_dir: str = "assets/srt/"
+    subtitle_type: str = ".ass"
     # 模型：tiny | base | small | medium | large | downloaded_model_path
     whisper_model: str = 'medium' 
     # 只有最后224个token会被使用。'Hello, welcome to my lecture.'可以减少无标点符号的情况。之后的部分建议写一些可能很难识别的专用名词。此外，每一句话的前一句也会通过该脚本添加到prompt中。因此，这里的prompt长度建议不超过120个单词。

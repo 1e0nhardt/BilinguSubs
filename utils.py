@@ -32,9 +32,12 @@ LOGGER = logging.getLogger("rich")
 install(show_locals=False)
 
 
-def timeline_to_ms(timeline: str):
+def timestring_to_ms(timeline: str, ass=False):
     hrs, mins, sec_ms = timeline.strip().split(':')
-    seconds, ms = sec_ms.split(",")
+    if ass:
+        seconds, ms = sec_ms.split(".")
+    else:
+        seconds, ms = sec_ms.split(",")
     return (int(hrs) * 60 * 60 + int(mins) * 60 + int(seconds)) * 1000 + int(ms)
 
 

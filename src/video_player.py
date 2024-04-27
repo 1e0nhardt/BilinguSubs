@@ -1,21 +1,28 @@
-from pathlib import Path
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
-from ttkbootstrap.icons import Emoji
 from src.vlc_player import VlcPlayer
+
+from utils import LOGGER
 
 class MediaPlayer(ttk.Frame):
 
-    def __init__(self, master):
+    def __init__(self, master, *args):
         super().__init__(master)
         self.app = master
-        self.player = VlcPlayer()
+        self.player = VlcPlayer(*args)
         self.pack(fill=BOTH, expand=YES)
         
         self.scale_pressed = False
 
         self.create_media_window()
         self.create_progress_meter()
+    
+    def reload_for_ass(self, path):
+        LOGGER.error("Just Can't Work Properly!")
+        return
+        LOGGER.debug("RELOAD FOR ASS")
+        self.player.reload_ass(path)
+        self.player.play()
 
     def create_media_window(self):
         """Create frame to contain media"""

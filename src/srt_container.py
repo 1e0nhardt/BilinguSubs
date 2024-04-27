@@ -1,15 +1,25 @@
 import os
 
-from utils import LOGGER
+from utils import LOGGER, timestring_to_ms
 
-class SrtClip(object):
+class Clip(object):
 
-    def __init__(self) -> None:
+    def __init__(self, valid_style_names=[]) -> None:
+        if valid_style_names:
+            self.valid_style_names = valid_style_names
+        else:
+            self.valid_style_names = []
+
         self.id = 0
         self.start = ""
         self.end = ""
         self.source_text = ""
         self.target_text = ""
+        self.style = {}
+        self.type = 'srt'
+
+    def is_style_validate(self, style_name):
+        return style_name in self.valid_style_names
     
     def set_id(self, id: int):
         self.id = id
@@ -32,29 +42,34 @@ class SrtClip(object):
             LOGGER.warn(f"异常字幕数据: {text}")
     
     def get_start_time_ms(self):
-        return self.timeline_to_ms(self.start)
+        return timestring_to_ms(self.start, self.type == 'ass')
 
     def get_end_time_ms(self):
-        return self.timeline_to_ms(self.end)
+        return timestring_to_ms(self.end, self.type == 'ass')
     
     def time_in_clip(self, ptime):
-        return ptime > self.timeline_to_ms(self.start) and ptime < self.get_end_time_ms()
+        return ptime > self.get_start_time_ms() and ptime < self.get_end_time_ms()
     
     def full_text(self):
         return self.source_text + "\n" + self.target_text
 
     def update_text(self, all_text: str):
         splits = all_text.strip().splitlines()
-        if len(splits) == 2:
-            self.source_text, self.target_text = splits
+        if self.type == 'srt':
+            if len(splits) == 2:
+                self.source_text, self.target_text = splits
+            else:
+                self.source_text = all_text
+                LOGGER.info(f"非双语字幕数据: {all_text}")
         else:
-            self.source_text = all_text
-            LOGGER.warn(f"非双语字幕数据: {all_text}")
-    
-    def timeline_to_ms(self, timeline: str):
-        hrs, mins, sec_ms = timeline.strip().split(':')
-        seconds, ms = sec_ms.split(",")
-        return (int(hrs) * 60 * 60 + int(mins) * 60 + int(seconds)) * 1000 + int(ms)
+            if len(splits) == 3:
+                self.style['Style'], self.source_text, self.target_text = splits
+            elif len(splits) == 2:
+                self.style['Style'], self.source_text = splits
+                LOGGER.info(f"非双语字幕数据: {all_text}")
+            else:
+                self.source_text = all_text
+                LOGGER.warn(f'ass 字幕格式错误 {all_text}')
 
 
 class SrtContainer(object):
@@ -66,17 +81,17 @@ class SrtContainer(object):
     def is_empty(self) -> bool:
         return len(self.clips) == 0
     
-    def get_current_clip(self) -> SrtClip:
+    def get_current_clip(self) -> Clip:
         if len(self.clips) == 0:
             return
         return self.clips[self.current_index]
 
-    def get_current_prev_clip(self) -> SrtClip:
+    def get_current_prev_clip(self) -> Clip:
         if self.current_index == 0:
             return None
         return self.clips[self.current_index - 1]
 
-    def get_current_next_clip(self) -> SrtClip:
+    def get_current_next_clip(self) -> Clip:
         if self.current_index + 2 > len(self.clips):
             return None
         return self.clips[self.current_index + 1]
@@ -121,7 +136,7 @@ class SrtContainer(object):
         with open(path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
         
-        clip = SrtClip()
+        clip = Clip()
         all_text = []
         for line in lines:
             line = line.strip()
@@ -130,7 +145,7 @@ class SrtContainer(object):
                 if len(all_text) > 0:
                     clip.set_text("\n".join(all_text))
                     self.clips.append(clip)
-                    clip = SrtClip()
+                    clip = Clip()
                     clip.set_id(int(line))
                     all_text = []
                 else: # 第一条

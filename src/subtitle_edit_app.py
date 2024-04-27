@@ -7,17 +7,19 @@ from ttkbootstrap.constants import *
 from ttkbootstrap.icons import Emoji
 from tkinter import filedialog
 
-from src.srt_container import SrtClip, SrtContainer
+from src.srt_container import SrtContainer
+from src.ass_container import AssContainer
 from src.video_player import MediaPlayer
 from src.subtitle_editor import SubtitleEditor
 from src.config import AppConfig
 from src.whisper_agent import WhisperAgent
-from utils import LOGGER, timeline_to_ms
+from utils import LOGGER, timestring_to_ms
 
 @dataclass
 class AppState:
 
     playing: bool = False
+    use_ass: bool = False
 
 
 class Application(ttk.Window):
@@ -26,21 +28,22 @@ class Application(ttk.Window):
         super().__init__(title, theme_name, **args)
         self.state = AppState()
         self.config = AppConfig()
-        self.srt_container = SrtContainer()
-        # self.srt_container.load_srt(self.config.srt_dir + "Creating a Cozy Pixel Campfire for a Roguelike Deckbuilder (S02E07).srt")
         self.agent = WhisperAgent(self.config)
+        self.subtitle_container = None
+        self.mp = None
+        self.load_srt(self.agent.bi_srt_path)
         self.task_progress_value = ttk.DoubleVar()
 
         self.hdr_var = ttk.StringVar()
         # self.create_header()
-        self.mp = MediaPlayer(self)
+        # self.mp = MediaPlayer(self)
+        self.mp = MediaPlayer(self, f'--sub-file={self.agent.bi_srt_path}')
         self.create_buttonbox()
         self.editor = SubtitleEditor(self)
         self.next_editor = SubtitleEditor(self, next=True)
         self.play(self.config.video_path)
 
-        self.editor.load_clip(self.srt_container.get_current_clip())
-        self.next_editor.load_clip(self.srt_container.get_current_next_clip())
+        self.update_clip(0, force=True)
 
     def create_header(self):
         """The application header to display user messages"""
@@ -172,18 +175,17 @@ class Application(ttk.Window):
         self.mp.player.stop()
     
     def update_clip(self, play_time: float, force=False, translate=False, transcribe=False):
-        curr_clip = self.srt_container.get_current_clip()
+        curr_clip = self.subtitle_container.get_current_clip()
         if translate:
             curr_clip.target_text = self.agent.translate(curr_clip.source_text)
-            LOGGER.debug(curr_clip.full_text())
         
         if transcribe:
             self.agent.tanscribe(curr_clip)
 
         # LOGGER.debug(play_time)
-        if force or self.srt_container.update_current_clip(play_time):
-            self.editor.load_clip(self.srt_container.get_current_clip())
-            self.next_editor.load_clip(self.srt_container.get_current_next_clip())
+        if force or self.subtitle_container.update_current_clip(play_time):
+            self.editor.load_clip(self.subtitle_container.get_current_clip())
+            self.next_editor.load_clip(self.subtitle_container.get_current_next_clip())
 
     def on_play_button_click(self, e=None):
         if self.state.playing:
@@ -198,11 +200,11 @@ class Application(ttk.Window):
             self.config.video_path = filedialog.askopenfilename(title="选择视频文件", filetypes=[('Video File', '.mp4 .mkv')])
             self.agent.update_video_path()
             if self.agent.path_exists(self.agent.bi_srt_path):
-                self.srt_container.load_srt(self.agent.bi_srt_path)
+                self.subtitle_container.load_srt(self.agent.bi_srt_path)
             self.play(self.config.video_path)
         elif type == 'srt':
-            srt_path = filedialog.askopenfilename(title="选择字幕文件", filetypes=[('Srt File', '.srt')])
-            self.srt_container.load_srt(srt_path)
+            srt_path = filedialog.askopenfilename(title="选择字幕文件", filetypes=[('Srt File', '.srt .ass')])
+            self.load_srt(srt_path)
             self.update_clip(self.mp.player.get_time(), force=True)
         else:
             assert False, f'invalid file type {type}'
@@ -213,11 +215,11 @@ class Application(ttk.Window):
             return
 
         if os.path.exists(self.agent.bi_srt_path):
-            self.srt_container.load_srt(self.agent.bi_srt_path)
+            self.subtitle_container.load_srt(self.agent.bi_srt_path)
         else:
             self.agent.speech_to_text()
             self.agent.translate_srt()
-            self.srt_container.load_srt(self.agent.bi_srt_path)
+            self.subtitle_container.load_srt(self.agent.bi_srt_path)
 
     def on_clip_nav(self, next=True, timeline=""):
         
@@ -225,19 +227,39 @@ class Application(ttk.Window):
             self.pause()
 
         if timeline != "":
-            val = timeline_to_ms(timeline) / self.mp.player.get_length()
+            val = timestring_to_ms(timeline, self.state.use_ass) / self.mp.player.get_length()
         elif next:
-            val = self.srt_container.get_current_next_clip().get_start_time_ms() / self.mp.player.get_length()
+            val = self.subtitle_container.get_current_next_clip().get_start_time_ms() / self.mp.player.get_length()
         else:
-            val = self.srt_container.get_current_prev_clip().get_start_time_ms() / self.mp.player.get_length()
+            val = self.subtitle_container.get_current_prev_clip().get_start_time_ms() / self.mp.player.get_length()
         self.mp.on_progress(val, force=True)
         self.play()
-    
+
+    def load_srt(self, path: str):
+        if path.endswith('.srt'):
+            LOGGER.info(f'{path} SRT加载成功')
+            self.subtitle_container = SrtContainer()
+            self.state.use_ass = False
+        else:
+            LOGGER.info(f'{path} ASS加载成功')
+            self.subtitle_container = AssContainer()
+            self.state.use_ass = True
+            # if self.mp:
+            #     self.mp.reload_for_ass(path)
+                # self.play(self.config.video_path)
+        self.subtitle_container.load_srt(path)        
+
     def export_srt(self):
-        srt_text = self.srt_container.export_srt()
-        filepath = filedialog.asksaveasfilename(filetypes=[("Srt File", ".srt")])
-        if not filepath.endswith(".srt"):
-            filepath += ".srt"
+        srt_text = self.subtitle_container.export_srt()
+        filepath = filedialog.asksaveasfilename(filetypes=[("Srt File", ".srt .ass")])
+
+        if self.subtitle_container is AssContainer:
+            if not filepath.endswith(".ass"):
+                filepath += ".ass"
+        else:
+            if not filepath.endswith(".srt"):
+                filepath += '.srt'
+
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(srt_text)
 
