@@ -58,8 +58,8 @@ class WhisperAgent(object):
             for word_dict in segment['words']:
                 transcribe_text += (word_dict['word'])
 
-        clip.source_text = transcribe_text.strip()
-        clip.target_text = self.translate(transcribe_text)
+        clip.target_text = transcribe_text.strip()
+        clip.source_text = self.translate(transcribe_text)
 
     def extract_audio_from_video(self):
         if self.path_exists(self.audio_path):

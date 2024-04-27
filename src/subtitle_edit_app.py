@@ -6,7 +6,7 @@ import subprocess
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from ttkbootstrap.icons import Emoji
-from tkinter import filedialog
+from tkinter import filedialog, dialog
 
 from src.srt_container import SrtContainer
 from src.ass_container import AssContainer
@@ -15,6 +15,11 @@ from src.subtitle_editor import SubtitleEditor
 from src.config import AppConfig
 from src.whisper_agent import WhisperAgent
 from utils import LOGGER, timestring_to_ms
+
+replace_dict = {
+    '戈多': 'Godot',
+}
+
 
 @dataclass
 class AppState:
@@ -39,6 +44,13 @@ class Application(ttk.Window):
         # self.mp = MediaPlayer(self)
         self.mp = MediaPlayer(self, f'--sub-file={self.agent.bi_srt_path}')
         self.create_buttonbox()
+        self.replace_words_editor = ttk.Text(
+            self, 
+            height=1,
+            font="-size 12"
+        )
+        # self.text_editor.insert(INSERT, "hello world")
+        self.replace_words_editor.pack(fill=X, expand=TRUE)
         self.editor = SubtitleEditor(self)
         self.next_editor = SubtitleEditor(self, next=True)
 
@@ -147,6 +159,15 @@ class Application(ttk.Window):
             command=self.export_srt
         )
         export_btn.pack(side=LEFT, fill=X, expand=YES)
+        
+        export_btn = ttk.Button(
+            master=container,
+            text="常见错误词语替换",
+            # bootstyle=SECONDARY,
+            padding=10,
+            command=self.replace_wrong_words
+        )
+        export_btn.pack(side=LEFT, fill=X, expand=YES)
 
         self.combine_btn = ttk.Button(
             master=container,
@@ -192,6 +213,16 @@ class Application(ttk.Window):
         if force or self.subtitle_container.update_current_clip(play_time):
             self.editor.load_clip(self.subtitle_container.get_current_clip())
             self.next_editor.load_clip(self.subtitle_container.get_current_next_clip())
+    
+    def replace_wrong_words(self):
+        # k:v;
+        text = self.replace_words_editor.get(0.0, END)
+        splits = text.split(';')
+        for s in splits:
+            k, v = s.split(':')
+            replace_dict[k.strip()] = v.strip() 
+        self.editor.replace_wrong_words(replace_dict)
+        self.next_editor.replace_wrong_words(replace_dict)
 
     def on_play_button_click(self, e=None):
         if isinstance(self.focus_get(), ttk.Text):

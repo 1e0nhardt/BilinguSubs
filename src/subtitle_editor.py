@@ -81,3 +81,10 @@ class SubtitleEditor(ttk.Frame):
             self.app.subtitle_container.get_current_next_clip().update_text(self.text_editor.get(0.0, END))
         else:
             self.app.subtitle_container.get_current_clip().update_text(self.text_editor.get(0.0, END))
+    
+    def replace_wrong_words(self, replace_dict: dict):
+        full_text = self.text_editor.get(0.0, END)
+        self.text_editor.delete(1.0, END)
+        for k, v in replace_dict.items():
+            full_text = full_text.replace(k, v)
+        self.text_editor.insert(INSERT, full_text)
