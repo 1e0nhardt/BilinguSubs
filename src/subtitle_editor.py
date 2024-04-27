@@ -51,7 +51,7 @@ class SubtitleEditor(ttk.Frame):
         )
         # self.text_editor.insert(INSERT, "hello world")
         self.text_editor.pack(fill=X, expand=TRUE)
-        # self.text_editor.bind("<Key>", self.on_text_changed)
+        self.text_editor.bind("<KeyRelease>", self.on_text_changed)
         # self.text_editor.tag_add("good", 1.0, 2.0)  # 区域名："good"，区域：第一行第0列---->第2行第0列
         # self.text_editor.tag_config("good", background="yellow", foreground="red") #　设置"good"区域背景和前景颜色
         # self.text_editor.tag_bind("good", "<Button-1>", lambda e: print("hello world"))
@@ -77,15 +77,6 @@ class SubtitleEditor(ttk.Frame):
             return
 
         # LOGGER.debug(f"KeyTyped {e.char}")
-        if self.is_next:
-            self.app.subtitle_container.get_current_next_clip().update_text(self.text_editor.get(0.0, END))
-        else:
-            self.app.subtitle_container.get_current_clip().update_text(self.text_editor.get(0.0, END))
-    
-    def on_save(self):
-        if self.app.subtitle_container.is_empty():
-            return
-
         if self.is_next:
             self.app.subtitle_container.get_current_next_clip().update_text(self.text_editor.get(0.0, END))
         else:

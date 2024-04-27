@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from functools import partial
 import os
+import subprocess
 
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
@@ -40,7 +41,6 @@ class Application(ttk.Window):
         self.create_buttonbox()
         self.editor = SubtitleEditor(self)
         self.next_editor = SubtitleEditor(self, next=True)
-        self.save_btn.configure(command=self.editor.on_save)
 
     def create_header(self):
         """The application header to display user messages"""
@@ -148,13 +148,14 @@ class Application(ttk.Window):
         )
         export_btn.pack(side=LEFT, fill=X, expand=YES)
 
-        self.save_btn = ttk.Button(
+        self.combine_btn = ttk.Button(
             master=container,
-            text="上方字幕保存",
+            text="合成mkv",
             # bootstyle=SECONDARY,
-            padding=10
+            padding=10,
+            command=self.on_export_mkv
         )
-        self.save_btn.pack(side=LEFT, fill=X, expand=YES)
+        self.combine_btn.pack(side=LEFT, fill=X, expand=YES)
 
         # transcribe_pregress = ttk.Progressbar(
         #     master=container,
@@ -195,7 +196,7 @@ class Application(ttk.Window):
     def on_play_button_click(self, e=None):
         if isinstance(self.focus_get(), ttk.Text):
             return
-            
+
         if self.state.playing:
             self.pause()
         else:
@@ -242,6 +243,16 @@ class Application(ttk.Window):
             val = self.subtitle_container.get_current_prev_clip().get_start_time_ms() / self.mp.player.get_length()
         self.mp.on_progress(val, force=True)
         self.play()
+
+    def on_export_mkv(self):
+        if self.state.playing:
+            self.pause()
+        srt_text = self.subtitle_container.export_srt()
+        with open(self.agent.bi_srt_path, 'w', encoding='utf-8') as f:
+            f.write(srt_text)
+        subprocess.run(
+            f"ffmpeg -i \"{self.config.video_path}\" -i \"{self.agent.bi_srt_path}\" -c copy \"{self.config.video_path.replace('.mp4', '.mkv')}\""
+        )
 
     def load_srt(self, path: str):
         if path.endswith('.srt'):
