@@ -43,7 +43,7 @@ class TaskConfig:
     comma_as_end_threshold: int = 70
     # 调用翻译api每次发送的字符上限, 建议英文4500，日文1600。否则可能会报API server error.
     api_character_limit = 4200
-    # 只进行翻译(使用srt_dir中的.srt文件)
+    # 只进行翻译(使用srt_dir中的.srt文件)                                                                                
     only_translate: bool = False
     # 语音转文字+翻译(使用audio_dir中的.mp3, .wav, .m4a文件)
     input_is_audio: bool = True
@@ -166,7 +166,7 @@ class GenerateSrtTask(object):
     def translate_srt(self, basename):
         filename, suffix = os.path.splitext(basename)
 
-        srt_path = self.config.srt_dir + filename + self.config.subtitle_type
+        srt_path = self.config.srt_dir + filename + '.srt'
         bilingual_srt_path = self.config.video_dir + filename + self.config.subtitle_type
 
         if os.path.exists(bilingual_srt_path):

@@ -144,13 +144,14 @@ class WhisperAgent(object):
     
     def update_video_path(self):
         path = self.config.video_path
-        LOGGER.debug(path)
         filename, suffix = os.path.splitext(os.path.basename(path))
         ensure_folder_exists(self.config.audio_dir)
         ensure_folder_exists(self.config.srt_dir)
-        self.audio_path = self.config.audio_dir + filename + '.mp3'
+        self.audio_path = self.config.audio_dir + filename + '.m4a'
+        if not self.path_exists(self.audio_path):
+            self.audio_path.replace('.m4a', '.mp3')
         self.srt_path = self.config.srt_dir + filename + '_en' + self.config.subtitle_type
-        self.bi_srt_path = self.config.srt_dir + filename + self.config.subtitle_type
+        self.bi_srt_path = self.config.video_path.replace('.mp4', self.config.subtitle_type)
         LOGGER.info(f'AudioPath: {self.audio_path}')
         LOGGER.info(f'SrtPath: {self.srt_path}')
 

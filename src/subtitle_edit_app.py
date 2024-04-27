@@ -31,7 +31,6 @@ class Application(ttk.Window):
         self.agent = WhisperAgent(self.config)
         self.subtitle_container = None
         self.mp = None
-        self.load_srt(self.agent.bi_srt_path)
         self.task_progress_value = ttk.DoubleVar()
 
         self.hdr_var = ttk.StringVar()
@@ -41,9 +40,7 @@ class Application(ttk.Window):
         self.create_buttonbox()
         self.editor = SubtitleEditor(self)
         self.next_editor = SubtitleEditor(self, next=True)
-        self.play(self.config.video_path)
-
-        self.update_clip(0, force=True)
+        self.save_btn.configure(command=self.editor.on_save)
 
     def create_header(self):
         """The application header to display user messages"""
@@ -151,13 +148,21 @@ class Application(ttk.Window):
         )
         export_btn.pack(side=LEFT, fill=X, expand=YES)
 
-        transcribe_pregress = ttk.Progressbar(
+        self.save_btn = ttk.Button(
             master=container,
-            bootstyle="success",
-            maximum=1,
-            variable=self.task_progress_value
+            text="上方字幕保存",
+            # bootstyle=SECONDARY,
+            padding=10
         )
-        transcribe_pregress.pack(side=LEFT, fill=X, expand=YES)
+        self.save_btn.pack(side=LEFT, fill=X, expand=YES)
+
+        # transcribe_pregress = ttk.Progressbar(
+        #     master=container,
+        #     bootstyle="success",
+        #     maximum=1,
+        #     variable=self.task_progress_value
+        # )
+        # transcribe_pregress.pack(side=LEFT, fill=X, expand=YES)
 
     def play(self, path=None):
         self.state.playing = True
@@ -188,6 +193,9 @@ class Application(ttk.Window):
             self.next_editor.load_clip(self.subtitle_container.get_current_next_clip())
 
     def on_play_button_click(self, e=None):
+        if isinstance(self.focus_get(), ttk.Text):
+            return
+            
         if self.state.playing:
             self.pause()
         else:
@@ -200,7 +208,7 @@ class Application(ttk.Window):
             self.config.video_path = filedialog.askopenfilename(title="选择视频文件", filetypes=[('Video File', '.mp4 .mkv')])
             self.agent.update_video_path()
             if self.agent.path_exists(self.agent.bi_srt_path):
-                self.subtitle_container.load_srt(self.agent.bi_srt_path)
+                self.load_srt(self.agent.bi_srt_path)
             self.play(self.config.video_path)
         elif type == 'srt':
             srt_path = filedialog.askopenfilename(title="选择字幕文件", filetypes=[('Srt File', '.srt .ass')])
@@ -252,14 +260,14 @@ class Application(ttk.Window):
     def export_srt(self):
         srt_text = self.subtitle_container.export_srt()
         filepath = filedialog.asksaveasfilename(filetypes=[("Srt File", ".srt .ass")])
-
-        if self.subtitle_container is AssContainer:
+        if isinstance(self.subtitle_container, AssContainer):
             if not filepath.endswith(".ass"):
                 filepath += ".ass"
         else:
             if not filepath.endswith(".srt"):
                 filepath += '.srt'
 
+        LOGGER.debug(filepath)
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(srt_text)
 

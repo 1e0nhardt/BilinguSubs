@@ -87,7 +87,6 @@ class MediaPlayer(ttk.Frame):
         if (not force) and (not self.scale_pressed):
             return
             
-        print(f"Set Position {val} after")
         self.update_time_labels(val)
         self.player.set_position(val)
         self.app.update_clip(self.player.get_time())

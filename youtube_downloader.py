@@ -9,11 +9,13 @@ import tyro
 
 @dataclass
 class DownloadConfig:
-    dest_dir: str = 'assets/video/hazel/video/'
-    download_dir: str = 'assets/video/hazel/audio/'
-    misc_dir: str = 'assets/video/hazel/misc/'
-    url: str = 'https://www.youtube.com/watch?v=JxIZbV_XjAs&list=PLlrATfBNZ98dC-V-N3m0Go4deliWHPFwT'
-    prefix: str = 'Hazel'
+    dest_dir: str = 'assets/video/'
+    download_dir: str = 'assets/audio/'
+    misc_dir: str = 'assets/misc/'
+    # YouTube URL.
+    url: str = 'https://www.youtube.com/watch?v=EYt6uDr-PHQ'
+    # 下载播放列表时给文件名加的前缀
+    prefix: str = ''
 
 
 class YoutubeDownloader(object):

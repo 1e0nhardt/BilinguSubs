@@ -166,7 +166,7 @@ class AssContainer(object):
             srt_text += f"Dialogue: "
             srt_text += f"0,{clip.start},{clip.end},{clip.style.get('Style', self.styles[0]['Name'])},"
             srt_text += f",{clip.style.get('MarginL', 0)},{clip.style.get('MarginR', 0)},{clip.style.get('MarginV', 0)},"
-            srt_text += f",{self.source_text}\\N{self.target_text}"
+            srt_text += f",{clip.source_text}\\N{clip.target_text.strip()}\n"
         
         return srt_text
     
