@@ -10,13 +10,16 @@ SCRIPT_INFO = """
 ; https://github.com/1e0nhardt/BilinguSubs
 ScriptType: v4.00+
 ScaledBorderAndShadow: Yes
+PlayResX: 1920
+PlayResY: 1080
 WrapStyle: 0
 """.strip()
 
 STYLES = """
+[V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,方正黑体_GBK,36,&H00FFFFFF,&HF0000000,&H00000000,&H32000000,0,0,0,0,100,100,0,0,1,2,1,2,5,5,2,134
-Style: Sub,微软雅黑,36,&H00020207,&H000000FF,&H00FFFFFF,&H000FF3D1,-1,0,0,0,100,100,0,0,1,2,0.2,2,10,10,15,1
+Style: ZH,思源宋体,50,&H00FFFFFF,&HF0000000,&H00000000,&H32000000,0,0,0,0,100,100,0,0,1,2,1,2,5,5,2,1
+Style: EN,Helvetica,28,&H00FFFFFF,&HF0000000,&H00000000,&H32000000,0,0,0,0,100,100,0,0,1,2,1,2,5,5,2,1
 """.strip()
 
 class AssContainer(object):
@@ -157,7 +160,7 @@ class AssContainer(object):
                 continue
 
     def export_srt(self):
-        srt_text = SCRIPT_INFO + '\n\n' + STYLES + '\n\n' + '[Events]\n' + 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text'
+        srt_text = SCRIPT_INFO + '\n\n' + STYLES + '\n\n' + '[Events]\n' + 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n'
         
         for clip in self.clips:
             srt_text += f"Dialogue: "
