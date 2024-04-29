@@ -5,6 +5,7 @@ class AppConfig:
     video_path: str = "assets/video/ff1.mp4"
     audio_dir: str = "assets/audio/"
     srt_dir: str = "assets/srt/"
+    mkv_dir: str = "assets/mkv/"
     subtitle_type: str = ".ass"
     # 模型：tiny | base | small | medium | large | downloaded_model_path
     whisper_model: str = 'medium' 

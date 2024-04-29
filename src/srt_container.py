@@ -17,8 +17,11 @@ class Clip(object):
         self.target_text = ""
         self.style = {}
         self.type = 'srt'
+        self.next_clips = [] # 重新transcribe大段语句时使用。
 
     def is_style_validate(self, style_name):
+        if len(self.valid_style_names) == 0:
+            return
         return style_name in self.valid_style_names
     
     def set_id(self, id: int):
@@ -40,6 +43,17 @@ class Clip(object):
         else:
             self.source_text = text
             LOGGER.warn(f"异常字幕数据: {text}")
+    
+    def get_ass_timeline(self, t):
+        """1234.12 -> xx:xx:xx,xxx (h:m:s,ms)"""
+        seconds = int(t)
+        ms = round(t - seconds, 3)
+        ms = f'{ms:.2f}'[2:]
+        minutes = seconds // 60
+        seconds %= 60
+        hours = minutes // 60
+        minutes %= 60
+        return f'{hours:02d}:{minutes:02d}:{seconds:02d}.{ms}'
     
     def get_start_time_ms(self):
         return timestring_to_ms(self.start, self.type == 'ass')

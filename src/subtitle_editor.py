@@ -6,10 +6,11 @@ from utils import LOGGER
 
 class SubtitleEditor(ttk.Frame):
 
-    def __init__(self, master, next=False) -> None:
+    def __init__(self, master, next=False, prev=False) -> None:
         super().__init__(master)
         self.app = master
         self.is_next = next
+        self.is_prev = prev
         self.id_label = ttk.StringVar(value="12")
         self.time_label_start = ttk.StringVar(value="00:13:21:123")
         self.time_label_end = ttk.StringVar(value="00:13:23:123")
@@ -79,6 +80,8 @@ class SubtitleEditor(ttk.Frame):
         # LOGGER.debug(f"KeyTyped {e.char}")
         if self.is_next:
             self.app.subtitle_container.get_current_next_clip().update_text(self.text_editor.get(0.0, END))
+        elif self.is_prev:
+            self.app.subtitle_container.get_current_prev_clip().update_text(self.text_editor.get(0.0, END))
         else:
             self.app.subtitle_container.get_current_clip().update_text(self.text_editor.get(0.0, END))
     
@@ -88,3 +91,4 @@ class SubtitleEditor(ttk.Frame):
         for k, v in replace_dict.items():
             full_text = full_text.replace(k, v)
         self.text_editor.insert(INSERT, full_text)
+        self.on_text_changed(N)

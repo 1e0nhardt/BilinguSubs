@@ -51,15 +51,31 @@ class WhisperAgent(object):
         clip_start = int(clip.get_start_time_ms() / 1000 * SAMPLE_RATE)
         clip_end = int((clip.get_end_time_ms()) / 1000 * SAMPLE_RATE)
 
-        result = self.model.transcribe(self.audio_np[clip_start:clip_end], word_timestamps=True, initial_prompt=self.config.whisper_prompt, task=self.config.task)
+        # 用prompt
+        result = self.model.transcribe(self.audio_np[clip_start:clip_end], word_timestamps=True, initial_prompt=self.config.whisper_prompt + clip.target_text, task=self.config.task)
 
-        transcribe_text = ""
+        sa = SrtAssembler(self.config.comma_as_end_threshold)
         for segment in result['segments']:
             for word_dict in segment['words']:
-                transcribe_text += (word_dict['word'])
+                sa.get_next_input(word_dict, offset=clip_start/SAMPLE_RATE)
+        LOGGER.debug(sa.srt_lines)
+        clip.end = clip.get_ass_timeline(sa.srt_lines[0]['end'])
+        clip.target_text = '{\\rEN}' + sa.srt_lines[0]['text']
+        clip.source_text = self.translate(sa.srt_lines[0]['text'])
 
-        clip.target_text = transcribe_text.strip()
-        clip.source_text = self.translate(transcribe_text)
+        if len(sa.srt_lines) == 1:
+            return
+
+        for line in sa.srt_lines[1:]:
+            next_clip = Clip()
+            next_clip.set_id('666')
+            next_clip.type = 'ass'
+            next_clip.start = next_clip.get_ass_timeline(line['start'])
+            next_clip.end = next_clip.get_ass_timeline(line['end'])
+            next_clip.target_text = '{\\rEN}' + line['text']
+            next_clip.source_text = self.translate(line['text'])
+            next_clip.style = clip.style.copy()
+            clip.next_clips.append(next_clip)
 
     def extract_audio_from_video(self):
         if self.path_exists(self.audio_path):

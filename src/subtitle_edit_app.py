@@ -16,10 +16,6 @@ from src.config import AppConfig
 from src.whisper_agent import WhisperAgent
 from utils import LOGGER, timestring_to_ms
 
-replace_dict = {
-    '戈多': 'Godot',
-}
-
 
 @dataclass
 class AppState:
@@ -49,8 +45,9 @@ class Application(ttk.Window):
             height=1,
             font="-size 12"
         )
-        # self.text_editor.insert(INSERT, "hello world")
+        self.replace_words_editor.insert(INSERT, "戈多:Godot;")
         self.replace_words_editor.pack(fill=X, expand=TRUE)
+        self.prev_editor = SubtitleEditor(self, prev=True)
         self.editor = SubtitleEditor(self)
         self.next_editor = SubtitleEditor(self, next=True)
 
@@ -142,6 +139,33 @@ class Application(ttk.Window):
         )
         translate_btn.pack(side=LEFT, fill=X, expand=YES)
 
+        translate_btn = ttk.Button(
+            master=container,
+            text="删除前一个片段",
+            # bootstyle=SECONDARY,
+            padding=10,
+            command=self.delete_prev_clip
+        )
+        translate_btn.pack(side=LEFT, fill=X, expand=YES)
+
+        translate_btn = ttk.Button(
+            master=container,
+            text="延长当前片段时间轴",
+            # bootstyle=SECONDARY,
+            padding=10,
+            command=self.clip_timeline_adjust
+        )
+        translate_btn.pack(side=LEFT, fill=X, expand=YES)
+
+        translate_btn = ttk.Button(
+            master=container,
+            text="合并两个片段",
+            # bootstyle=SECONDARY,
+            padding=10,
+            command=self.combine_two_clip
+        )
+        translate_btn.pack(side=LEFT, fill=X, expand=YES)
+
         start_btn = ttk.Button(
             master=container,
             text="视频字幕生成",
@@ -159,6 +183,7 @@ class Application(ttk.Window):
             command=self.export_srt
         )
         export_btn.pack(side=LEFT, fill=X, expand=YES)
+        self.bind('<Control-s>', self.save_srt)
         
         export_btn = ttk.Button(
             master=container,
@@ -171,7 +196,7 @@ class Application(ttk.Window):
 
         self.combine_btn = ttk.Button(
             master=container,
-            text="合成mkv",
+            text="渲染硬字幕",
             # bootstyle=SECONDARY,
             padding=10,
             command=self.on_export_mkv
@@ -208,9 +233,12 @@ class Application(ttk.Window):
         
         if transcribe:
             self.agent.tanscribe(curr_clip)
+            self.subtitle_container.update_clip_and_next_clips()
+            force = True
 
         # LOGGER.debug(play_time)
         if force or self.subtitle_container.update_current_clip(play_time):
+            self.prev_editor.load_clip(self.subtitle_container.get_current_prev_clip())
             self.editor.load_clip(self.subtitle_container.get_current_clip())
             self.next_editor.load_clip(self.subtitle_container.get_current_next_clip())
     
@@ -218,9 +246,11 @@ class Application(ttk.Window):
         # k:v;
         text = self.replace_words_editor.get(0.0, END)
         splits = text.split(';')
+        replace_dict = {}
         for s in splits:
             k, v = s.split(':')
             replace_dict[k.strip()] = v.strip() 
+        self.prev_editor.replace_wrong_words(replace_dict)
         self.editor.replace_wrong_words(replace_dict)
         self.next_editor.replace_wrong_words(replace_dict)
 
@@ -274,6 +304,31 @@ class Application(ttk.Window):
             val = self.subtitle_container.get_current_prev_clip().get_start_time_ms() / self.mp.player.get_length()
         self.mp.on_progress(val, force=True)
         self.play()
+    
+    def combine_two_clip(self):
+        if self.state.playing:
+            self.pause()
+        cur_clip = self.subtitle_container.get_current_clip()
+        next_clip = self.subtitle_container.get_current_next_clip()
+        cur_clip.source_text += next_clip.source_text
+        cur_clip.target_text += next_clip.target_text
+        cur_clip.end = next_clip.end
+        self.subtitle_container.remove_next_clip()
+        self.update_clip(self.mp.player.get_time(), force=True)
+    
+    def delete_prev_clip(self):
+        if self.state.playing:
+            self.pause()
+        self.subtitle_container.remove_prev_clip()
+        self.update_clip(self.mp.player.get_time(), force=True)
+
+    def clip_timeline_adjust(self):
+        if self.state.playing:
+            self.pause()
+        cur_clip = self.subtitle_container.get_current_clip()
+        next_clip = self.subtitle_container.get_current_next_clip()
+        cur_clip.end = next_clip.start
+        self.update_clip(self.mp.player.get_time(), force=True)
 
     def on_export_mkv(self):
         if self.state.playing:
@@ -282,7 +337,7 @@ class Application(ttk.Window):
         with open(self.agent.bi_srt_path, 'w', encoding='utf-8') as f:
             f.write(srt_text)
         subprocess.run(
-            f"ffmpeg -i \"{self.config.video_path}\" -i \"{self.agent.bi_srt_path}\" -c copy \"{self.config.video_path.replace('.mp4', '.mkv')}\""
+            f"ffmpeg -i \"{self.config.video_path}\" -vf subtitles=\"{self.agent.bi_srt_path}\" \"{self.config.mkv_dir + os.path.basename(self.config.video_path)}\""
         )
 
     def load_srt(self, path: str):
@@ -309,9 +364,15 @@ class Application(ttk.Window):
             if not filepath.endswith(".srt"):
                 filepath += '.srt'
 
-        LOGGER.debug(filepath)
+        LOGGER.info(f'{filepath} 保存成功')
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(srt_text)
+    
+    def save_srt(self, e):
+        srt_text = self.subtitle_container.export_srt()
+        with open(self.agent.bi_srt_path, 'w', encoding='utf-8') as f:
+            f.write(srt_text)
+        LOGGER.info(f'{self.agent.bi_srt_path} 保存成功')
 
     def run(self):
         self.mainloop()

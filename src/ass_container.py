@@ -47,6 +47,16 @@ class AssContainer(object):
         if self.current_index + 2 > len(self.clips):
             return None
         return self.clips[self.current_index + 1]
+    
+    def remove_prev_clip(self):
+        if self.current_index == 0:
+            return None
+        self.clips.pop(self.current_index - 1)
+
+    def remove_next_clip(self):
+        if self.current_index + 2 > len(self.clips):
+            return None
+        self.clips.pop(self.current_index + 1)
 
     def udpate_current_clip(self, new_text):
         self.clips[self.current_index].update_text(new_text)
@@ -59,7 +69,16 @@ class AssContainer(object):
     
     def time_in_clip(self, ptime):
         return ptime > self.get_start_time_ms() and ptime < self.get_end_time_ms()
-    
+
+    def update_clip_and_next_clips(self):
+        clip = self.get_current_clip()
+        if len(clip.next_clips) == 0:
+            LOGGER.warn('没有要更新的片段')
+            return
+        
+        for c in reversed(clip.next_clips):
+            self.clips.insert(self.current_index + 1, c)
+
     def update_current_clip(self, play_time: float) -> bool:
         if self.get_current_clip() is None:
             return 
