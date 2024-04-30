@@ -89,11 +89,7 @@ class GenerateSrtTask(object):
         CONSOLE.rule('字幕翻译')
         
         for v in self._video_names:
-            try:
-                self.translate_srt(v)
-            except Exception as e:
-                LOGGER.warn(v +'翻译失败')
-                LOGGER.error(e)
+            self.translate_srt(v)
 
     def extract_audio_from_video(self, basename: str):
         filename, suffix = os.path.splitext(basename)
@@ -131,24 +127,33 @@ class GenerateSrtTask(object):
         # 将音频读取为numpy
         audio_np = whisper.audio.load_audio(audio_path)
 
-        # 选取长6分钟的片段
+        # 选取长5分钟的片段
+        segment_length = 5 * 60 * SAMPLE_RATE
         clip_start = 0
-        clip_end = clip_start + 6 * 60 * SAMPLE_RATE
+        clip_end = clip_start + segment_length
         clip_last_sentence = ''
 
         # 逐片段转文本
         sa = SrtAssembler(self.config.comma_as_end_threshold)
         while clip_end < audio_np.size:
-            result = self.model.transcribe(audio_np[clip_start:clip_end], word_timestamps=True, initial_prompt=self.config.whisper_prompt + ' ' + clip_last_sentence, task=self.config.task)
+            result = self.model.transcribe(audio_np[clip_start:clip_end], word_timestamps=True, initial_prompt=self.config.whisper_prompt + ' ' + filename + '.', task=self.config.task)
                 
             for segment in result['segments']:
                 for word_dict in segment['words']:
                     sa.get_next_input(word_dict, clip_start / SAMPLE_RATE)
             
-            clip_start, clip_last_sentence = sa.get_clip_end_info(SAMPLE_RATE)
-            clip_end = clip_start + 6 * 60 * SAMPLE_RATE
-
-            self.progress.update(whisper_task, advance=(clip_end - clip_start)/audio_np.size*100)
+            new_clip_start, clip_last_sentence = sa.get_clip_end_info(SAMPLE_RATE)
+            if new_clip_start == clip_start:
+                # 输出没有标点导致的
+                LOGGER.warn(f"{filename} with {segment_length/SAMPLE_RATE} sucks.")
+                LOGGER.debug(clip_last_sentence)
+                sa.line_text = ""                
+                LOGGER.error("转文本失败，跳过")
+                return
+                # segment_length = segment_length + int(SAMPLE_RATE * random() * 60)
+            clip_start = new_clip_start
+            clip_end = clip_start + segment_length
+            self.progress.update(whisper_task, completed=clip_start/audio_np.size*100)
         else:
             result = self.model.transcribe(audio_np[clip_start:], word_timestamps=True, initial_prompt=self.config.whisper_prompt + ' ' + clip_last_sentence, task=self.config.task)
 
@@ -173,6 +178,10 @@ class GenerateSrtTask(object):
             LOGGER.info(bilingual_srt_path + ' 已存在')
             return
         
+        if not os.path.exists(srt_path):
+            LOGGER.error('待翻译文本不存在')
+            return
+        
         with CONSOLE.status(filename + ' 翻译中', spinner='earth'):
             if self.config.use_baidu_api:
                 translator = BaiduTranslator(
@@ -188,18 +197,30 @@ class GenerateSrtTask(object):
             subtitles = []
             translated_subtitles = []
             total_chara = 0
+            # last_len = 0
             with open(srt_path, 'r', encoding='utf-8') as f:
                 text_lines = f.readlines()
+                
                 for i in range(2, len(text_lines) - 1, 4):
                     subtitle = text_lines[i]
                     total_chara += len(subtitle)
-                    subtitles.append(text_lines[i])
+                    subtitles.append(subtitle)
+                    # 打包翻译，减少API调用次数
                     if total_chara > self.config.api_character_limit:
                         translation = translator.translate(''.join(subtitles))
-                        translated_subtitles.extend(translation.split('\n'))
+                        translation_lst = translation.split('\n')
+                        # 打包翻译有时会导致行数不匹配，此时尝试用更少的行数打包翻译。
+                        if len(translation_lst) != len(subtitles):
+                            translation_lst.clear()
+                            for i in range(0, len(subtitles), 10):
+                                translation = translator.translate(''.join(subtitles[i:i+10]))
+                                time.sleep(0.01)
+                                translation_lst.extend(translation.split('\n'))
+                            LOGGER.debug(len(translation_lst) != len(subtitles))
+                        translated_subtitles.extend(translation_lst)
                         subtitles = []
                         total_chara = 0
-                        time.sleep(.2) # 等待0.2秒
+                        time.sleep(.1) # 等待0.2秒
 
                 translation = translator.translate(''.join(subtitles))
                 translated_subtitles.extend(translation.split('\n'))
@@ -234,7 +255,6 @@ class GenerateSrtTask(object):
                         if self.config.only_zh:
                             srt_text += f",{translated_subtitles[i // 4]}"
                         else:
-                            # srt_text += f",{translated_subtitles[i // 4]}\\N\\fs14{text_lines[i+2].strip()}\n"
                             srt_text += f",{translated_subtitles[i // 4]}\\N" + "{\\rEN}" + f"{text_lines[i+2].strip()}\n"
                     f.write(srt_text)
             else:

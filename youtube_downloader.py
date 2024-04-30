@@ -75,7 +75,7 @@ class YoutubeDownloader(object):
 
     # 选择视频质量(1080p)
     def download_video_from_streams(self, streams: StreamQuery, filename):
-        video_stream = streams.filter(mime_type="video/mp4").order_by('resolution').desc().first()
+        video_stream = streams.filter(adaptive=True, mime_type="video/mp4").order_by('resolution').desc().first()
         audio_stream = streams.filter(mime_type="audio/mp4").order_by('abr').desc().first()
         
         filename += video_stream.resolution
